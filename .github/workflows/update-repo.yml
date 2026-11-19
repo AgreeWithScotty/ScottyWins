@@ -29,7 +29,12 @@ jobs:
           git clone --depth 1 --filter=blob:none https://github.com/AgreeWithScotty/SmoothFlix.git .sources/SmoothFlix
 
       - name: Rebuild the repository index
-        run: python3 tools/build_repo.py --primescene .sources/PrimeScene --smoothflix .sources/SmoothFlix
+        run: |
+          if [ ! -f tools/build_repo.py ]; then
+            echo "Builder is not on this branch yet."
+            exit 0
+          fi
+          python3 tools/build_repo.py --primescene .sources/PrimeScene --smoothflix .sources/SmoothFlix
 
       - name: Commit new add-on versions
         run: |
