@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addons>
+<addon id="plugin.video.primeinterface" name="Prime Scene" version="0.1.23" provider-name="AgreeWithScotty">
+  <requires>
+    <import addon="xbmc.python" version="3.0.0" />
+    <import addon="script.module.beautifulsoup4" version="4.6.3+matrix.1" />
+    <import addon="script.module.mechanicalsoup" version="0.12.0+matrix.1" />
+    <import addon="script.module.pyxbmct" version="1.3.1+matrix.1" />
+    <import addon="script.module.inputstreamhelper" version="0.4.4+matrix.1" />
+    <import addon="script.module.requests" version="2.22.0+matrix.1" />
+    <import addon="script.module.pyautogui" version="0.9.49+matrix.1" />
+    <import addon="script.module.amazoncaptcha" version="0.5.11+matrix.1" />
+  </requires>
+  <extension point="xbmc.python.pluginsource" library="default.py">
+    <provides>video</provides>
+  </extension>
+  <extension point="xbmc.service" library="service.py" start="startup" />
+  <extension point="xbmc.addon.metadata">
+    <platform>all</platform>
+    <reuselanguageinvoker>false</reuselanguageinvoker>
+    <license>GPL-3.0-or-later</license>
+    <assets>
+      <icon>resources/art/prime-scene-icon-v2.png</icon>
+      <fanart>resources/art/prime-scene-fanart-v2.png</fanart>
+      </assets>
+    <summary lang="en_GB">Progressive Prime Video browsing in a dedicated interface</summary>
+    <description lang="en_GB">Prime Video add-on maintained by AgreeWithScotty. Includes GPL-3.0-or-later backend code derived from Sandmann79/xbmc. See NOTICE.md for upstream credits. Not affiliated with Amazon.</description>
+  </extension>
+</addon>
+<addon id="plugin.video.smoothflix" name="SmoothFlix" version="0.3.0" provider-name="Scott">
+  <requires>
+    <import addon="xbmc.python" version="3.0.1"/>
+    <import addon="inputstream.adaptive" version="21.5.0"/>
+    <import addon="script.module.inputstreamhelper" version="0.8.0"/>
+    <import addon="script.module.requests" version="2.27.0"/>
+    <import addon="script.module.pyaes" version="1.6.1"/>
+  </requires>
+  <extension point="xbmc.python.pluginsource" library="default.py">
+    <provides>video</provides>
+  </extension>
+  <extension point="xbmc.service" library="service.py"/>
+  <extension point="xbmc.addon.metadata">
+    <reuselanguageinvoker>true</reuselanguageinvoker>
+    <summary lang="en_GB">Netflix catalogue and playback for your own account</summary>
+    <description lang="en_GB">SmoothFlix signs in with your Netflix account and plays through inputstream.adaptive and Widevine. Aurora Cinema is the home, title and player screen: near-black, type-led, with artwork loaded by Kodi. A classic directory list is in the settings.</description>
+    <disclaimer lang="en_GB">Uses your own Netflix account. Video is played with Kodi inputstream.adaptive and Widevine. No other sources are used.</disclaimer>
+    <platform>all</platform>
+    <license>GPL-3.0-only</license>
+    <source>https://github.com/AgreeWithScotty/SmoothFlix</source>
+    <news>v0.3.0 (2026-11-19)[CR]- Aurora Cinema home, title page and player overlay.[CR]- Classic directory list remains available in settings.</news>
+    <assets>
+      <icon>icon.png</icon>
+      <fanart>fanart.jpg</fanart>
+    </assets>
+  </extension>
+</addon>
+<addon id="repository.primescene" name="Prime Scene Repository" version="0.1.2" provider-name="Prime Scene contributors">
+  <requires>
+    <import addon="xbmc.addon" version="21.0.0"/>
+  </requires>
+  <extension point="xbmc.addon.repository" name="Prime Scene Repository">
+    <dir>
+      <info compressed="false">https://agreewithscotty.github.io/ScottyWins/addons.xml</info>
+      <checksum verify="md5">https://agreewithscotty.github.io/ScottyWins/addons.xml.md5</checksum>
+      <datadir zip="true">https://agreewithscotty.github.io/ScottyWins/</datadir>
+    </dir>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">Prime Scene releases and updates</summary>
+    <description lang="en_GB">Delivers updates for the standalone Prime Scene add-on. The index is now hosted by ScottyWins.</description>
+    <platform>all</platform>
+    <license>GPL-3.0-or-later</license>
+    <source>https://github.com/AgreeWithScotty/ScottyWins</source>
+    <news>0.1.2[CR]- Repository index moved to ScottyWins.</news>
+    <assets>
+      <icon>icon.png</icon>
+    </assets>
+  </extension>
+</addon>
+<addon id="repository.scottywins" name="ScottyWins" version="1.0.0" provider-name="Scott">
+  <requires>
+    <import addon="xbmc.addon" version="21.0.0"/>
+  </requires>
+  <extension point="xbmc.addon.repository" name="ScottyWins">
+    <dir>
+      <info compressed="false">https://agreewithscotty.github.io/ScottyWins/addons.xml</info>
+      <checksum verify="md5">https://agreewithscotty.github.io/ScottyWins/addons.xml.md5</checksum>
+      <datadir zip="true">https://agreewithscotty.github.io/ScottyWins/</datadir>
+    </dir>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">Prime Scene and SmoothFlix updates</summary>
+    <description lang="en_GB">Kodi 21 repository that installs and updates Prime Scene and SmoothFlix.</description>
+    <platform>all</platform>
+    <license>GPL-3.0-or-later</license>
+    <source>https://github.com/AgreeWithScotty/ScottyWins</source>
+    <news>v1.0.0 (2026-11-19)[CR]- Repository for Prime Scene and SmoothFlix.</news>
+    <assets>
+      <icon>icon.png</icon>
+      <fanart>fanart.jpg</fanart>
+    </assets>
+  </extension>
+</addon>
+<addon id="repository.smoothflix" name="SmoothFlix Repository" version="1.0.1" provider-name="Scott">
+  <requires>
+    <import addon="xbmc.addon" version="21.0.0"/>
+  </requires>
+  <extension point="xbmc.addon.repository" name="SmoothFlix Repository">
+    <dir>
+      <info compressed="false">https://agreewithscotty.github.io/ScottyWins/addons.xml</info>
+      <checksum verify="md5">https://agreewithscotty.github.io/ScottyWins/addons.xml.md5</checksum>
+      <datadir zip="true">https://agreewithscotty.github.io/ScottyWins/</datadir>
+    </dir>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">Install and update SmoothFlix</summary>
+    <description lang="en_GB">Official repository for the SmoothFlix add-on. Updates are published from the ScottyWins index.</description>
+    <platform>all</platform>
+    <license>GPL-3.0-only</license>
+    <source>https://github.com/AgreeWithScotty/ScottyWins</source>
+    <news>v1.0.1 (2026-11-19)[CR]- Repository index moved to ScottyWins.</news>
+    <assets>
+      <icon>icon.png</icon>
+      <fanart>fanart.jpg</fanart>
+    </assets>
+  </extension>
+</addon>
+<addon provider-name="AgreeWithScotty" id="script.primescene.rewrite" name="Prime Scene Rewrite Preview" version="0.0.4">
+  <requires>
+    <import addon="xbmc.python" version="3.0.0" />
+  </requires>
+  <extension point="xbmc.python.script" library="preview.py">
+    <provides>video</provides>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">Independent Prime Scene storefront development preview</summary>
+    <description lang="en_GB">Browse Prime Video cards and try native sign-in in Kodi.</description>
+    <platform>all</platform>
+    <assets>
+      <icon>resources/icon.png</icon>
+    </assets>
+  </extension>
+</addon>
+</addons>
