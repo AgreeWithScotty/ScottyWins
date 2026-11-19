@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="repository.scottywins" name="ScottyWins" version="1.0.0" provider-name="Scott">
+  <requires>
+    <import addon="xbmc.addon" version="21.0.0"/>
+  </requires>
+  <extension point="xbmc.addon.repository" name="ScottyWins">
+    <dir>
+      <info compressed="false">https://agreewithscotty.github.io/ScottyWins/addons.xml</info>
+      <checksum verify="md5">https://agreewithscotty.github.io/ScottyWins/addons.xml.md5</checksum>
+      <datadir zip="true">https://agreewithscotty.github.io/ScottyWins/</datadir>
+    </dir>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">Prime Scene and SmoothFlix updates</summary>
+    <description lang="en_GB">Kodi 21 repository that installs and updates Prime Scene and SmoothFlix.</description>
+    <platform>all</platform>
+    <license>GPL-3.0-or-later</license>
+    <source>https://github.com/AgreeWithScotty/ScottyWins</source>
+    <news>v1.0.0 (2026-11-19)[CR]- Repository for Prime Scene and SmoothFlix.</news>
+    <assets>
+      <icon>icon.png</icon>
+      <fanart>fanart.jpg</fanart>
+    </assets>
+  </extension>
+</addon>
