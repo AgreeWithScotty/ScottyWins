@@ -1,6 +1,9 @@
 name: Update repository
 
 on:
+  push:
+    branches:
+      - cursor/scottywins-kodi-repo-0a2b
   schedule:
     - cron: "17 6 * * *"
   workflow_dispatch:
