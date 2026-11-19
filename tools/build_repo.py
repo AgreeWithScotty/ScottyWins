@@ -36,7 +36,10 @@ REPO_ADDONS = (
     "repository.smoothflix",
 )
 # Prebuilt zips live under packages/ in PrimeScene and next to the add-on
-# folder in SmoothFlix. Repository add-ons are authored in this repo.
+# folder in SmoothFlix. Repository add-ons are authored in this repo: their
+# addon.xml versions are the source of truth, and upstream repository.*
+# entries are ignored so a daily rebuild cannot rename or roll them back.
+KEEP_ROOT_ZIPS = ("repository.scottywins-1.0.0.zip",)
 SOURCES = (
     {
         "raw": "https://raw.githubusercontent.com/AgreeWithScotty/PrimeScene/main/",
@@ -422,8 +425,9 @@ def main():
     repo_zip = built["repository.scottywins"]
     root_zip = ROOT / repo_zip.name
     write_bytes(root_zip, repo_zip.read_bytes())
+    keep_root = {repo_zip.name, *KEEP_ROOT_ZIPS}
     for stale in ROOT.glob("repository.scottywins-*.zip"):
-        if stale.name != repo_zip.name:
+        if stale.name not in keep_root:
             stale.unlink()
     write_index(repo_zip.name, root_zip.stat().st_size)
     (ROOT / ".nojekyll").touch()

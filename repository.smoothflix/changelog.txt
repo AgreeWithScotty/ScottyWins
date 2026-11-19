@@ -1,3 +1,6 @@
+v1.0.2 (2026-11-19)
+- Shown as ScottyWins Repository.
+
 v1.0.1 (2026-11-19)
 - Repository index moved to ScottyWins.
 

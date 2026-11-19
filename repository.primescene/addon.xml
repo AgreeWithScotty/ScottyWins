@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="repository.primescene" name="Prime Scene Repository" version="0.1.2" provider-name="Prime Scene contributors">
+<addon id="repository.primescene" name="ScottyWins Repository" version="0.1.3" provider-name="Scott">
   <requires>
     <import addon="xbmc.addon" version="21.0.0"/>
   </requires>
-  <extension point="xbmc.addon.repository" name="Prime Scene Repository">
+  <extension point="xbmc.addon.repository" name="ScottyWins Repository">
     <dir>
       <info compressed="false">https://agreewithscotty.github.io/ScottyWins/addons.xml</info>
       <checksum verify="md5">https://agreewithscotty.github.io/ScottyWins/addons.xml.md5</checksum>
@@ -11,14 +11,15 @@
     </dir>
   </extension>
   <extension point="xbmc.addon.metadata">
-    <summary lang="en_GB">Prime Scene releases and updates</summary>
-    <description lang="en_GB">Delivers updates for the standalone Prime Scene add-on. The index is now hosted by ScottyWins.</description>
+    <summary lang="en_GB">ScottyWins Repository</summary>
+    <description lang="en_GB">ScottyWins Repository installs and updates Prime Scene and SmoothFlix on Kodi 21.</description>
     <platform>all</platform>
     <license>GPL-3.0-or-later</license>
     <source>https://github.com/AgreeWithScotty/ScottyWins</source>
-    <news>0.1.2[CR]- Repository index moved to ScottyWins.</news>
+    <news>0.1.3[CR]- Shown as ScottyWins Repository.</news>
     <assets>
       <icon>icon.png</icon>
+      <fanart>fanart.jpg</fanart>
     </assets>
   </extension>
 </addon>
