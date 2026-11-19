@@ -30,12 +30,22 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGES = "https://agreewithscotty.github.io/ScottyWins"
-PRIME_ID = "plugin.video.primeinterface"
-SMOOTH_ID = "plugin.video.smoothflix"
 REPO_ADDONS = (
     "repository.primescene",
     "repository.scottywins",
     "repository.smoothflix",
+)
+# Prebuilt zips live under packages/ in PrimeScene and next to the add-on
+# folder in SmoothFlix. Repository add-ons are authored in this repo.
+SOURCES = (
+    {
+        "raw": "https://raw.githubusercontent.com/AgreeWithScotty/PrimeScene/main/",
+        "zip_prefix": "packages/",
+    },
+    {
+        "raw": "https://raw.githubusercontent.com/AgreeWithScotty/SmoothFlix/main/",
+        "zip_prefix": "",
+    },
 )
 ZIP_DATE = (1980, 1, 1, 0, 0, 0)
 SKIP_DIRS = {"__pycache__", ".git"}
@@ -108,49 +118,78 @@ def zip_directory(addon_dir, dest):
     os.replace(tmp, dest)
 
 
-def version_from_addons_xml(path, addon_id):
-    if not path.is_file():
-        fail("missing %s" % path)
-    root = ET.parse(path).getroot()
+def listed_addons(addons_xml):
+    """Non-repository add-ons published by a source repo's addons.xml."""
+    if not addons_xml.is_file():
+        fail("missing %s" % addons_xml)
+    root = ET.parse(addons_xml).getroot()
+    found = []
     for element in root.findall("addon"):
-        if element.attrib.get("id") == addon_id:
-            return element.attrib["version"]
-    fail("%s is not listed in %s" % (addon_id, path))
+        addon_id = element.attrib.get("id", "")
+        if addon_id.startswith("repository."):
+            continue
+        if not addon_id or "version" not in element.attrib:
+            fail("addons.xml entry is missing an id or version")
+        found.append((addon_id, element.attrib["version"]))
+    return found
 
 
-def load_prime_zip(repo):
-    version = version_from_addons_xml(repo / "addons.xml", PRIME_ID)
-    filename = "%s-%s.zip" % (PRIME_ID, version)
-    local = repo / "packages" / PRIME_ID / filename
+def load_release_zip(repo, addon_id, version, raw_base, zip_prefix):
+    filename = "%s-%s.zip" % (addon_id, version)
+    relative = "%s%s/%s" % (zip_prefix, addon_id, filename)
+    local = repo / relative
     if local.is_file():
         data = local.read_bytes()
         origin = str(local)
     else:
-        url = (
-            "https://raw.githubusercontent.com/AgreeWithScotty/PrimeScene/main/"
-            "packages/%s/%s" % (PRIME_ID, filename)
-        )
+        url = raw_base + relative
         request = urllib.request.Request(url, headers={"User-Agent": "scottywins-build"})
         with urllib.request.urlopen(request, timeout=180) as response:
             data = response.read()
         origin = url
-    text = read_zip_addon_xml(data, PRIME_ID)
+    text = read_zip_addon_xml(data, addon_id)
     found_id, found_version = addon_id_version(text)
-    if found_id != PRIME_ID or found_version != version:
-        fail("Prime Scene zip %s is %s %s" % (origin, found_id, found_version))
-    return filename, data, text
+    if found_id != addon_id or found_version != version:
+        fail("%s is %s %s" % (origin, found_id, found_version))
+    return data, text
 
 
-def smooth_source(repo):
-    addon_dir = repo / SMOOTH_ID
-    addon_xml = addon_dir / "addon.xml"
-    if not addon_xml.is_file():
-        fail("missing %s" % addon_xml)
-    text = addon_xml.read_text(encoding="utf-8")
-    found_id, version = addon_id_version(text)
-    if found_id != SMOOTH_ID:
-        fail("%s has id %s" % (addon_dir, found_id))
-    return addon_dir, version, text
+def collect_source(repo, raw_base, zip_prefix):
+    """Yield (kind, id, version, payload, addon.xml text) for one checkout.
+
+    kind is "zip" (payload is bytes) or "source" (payload is the add-on directory).
+    Every non-repository addons.xml entry is included. A directory with its own
+    addon.xml is built from that tree; otherwise the published zip is copied.
+    """
+    listed = listed_addons(repo / "addons.xml")
+    seen = set()
+    items = []
+    for addon_id, version in listed:
+        seen.add(addon_id)
+        addon_xml = repo / addon_id / "addon.xml"
+        if addon_xml.is_file():
+            text = addon_xml.read_text(encoding="utf-8")
+            found_id, found_version = addon_id_version(text)
+            if found_id != addon_id:
+                fail("%s has id %s" % (addon_xml, found_id))
+            if found_version != version:
+                fail("%s is %s in addon.xml and %s in addons.xml" % (addon_id, found_version, version))
+            items.append(("source", addon_id, found_version, repo / addon_id, text))
+        else:
+            data, text = load_release_zip(repo, addon_id, version, raw_base, zip_prefix)
+            items.append(("zip", addon_id, version, data, text))
+    for child in sorted(repo.iterdir()):
+        if not child.is_dir() or child.name in seen or child.name.startswith("repository."):
+            continue
+        addon_xml = child / "addon.xml"
+        if not addon_xml.is_file():
+            continue
+        text = addon_xml.read_text(encoding="utf-8")
+        found_id, version = addon_id_version(text)
+        if found_id != child.name:
+            fail("%s has id %s" % (addon_xml, found_id))
+        items.append(("source", found_id, version, child, text))
+    return items
 
 
 def write_bytes(path, data):
@@ -209,6 +248,27 @@ def write_index(zip_name, size_bytes):
     write_bytes(ROOT / "index.html", html.encode("utf-8"))
 
 
+def addon_blocks(text):
+    """Map add-on id to the raw <addon> element, whitespace included."""
+    blocks = {}
+    position = 0
+    while True:
+        start = text.find("<addon ", position)
+        if start < 0:
+            break
+        end = text.find("</addon>", start)
+        if end < 0:
+            fail("addons.xml has an unclosed addon element")
+        end += len("</addon>")
+        element = text[start:end]
+        addon_id = ET.fromstring(element).attrib.get("id")
+        if not addon_id:
+            fail("addons.xml entry is missing an id")
+        blocks[addon_id] = element
+        position = end
+    return blocks
+
+
 def replace_addon_block(text, addon_id, fragment):
     marker = '<addon id="%s"' % addon_id
     start = text.find(marker)
@@ -222,7 +282,12 @@ def replace_addon_block(text, addon_id, fragment):
     indent = text[line_start:start]
     if indent.strip():
         indent = ""
-    block = "\n".join(indent + line if line else line for line in fragment.split("\n"))
+    # text[:start] already holds this line's indent. Prefixing the opening
+    # tag again is what turned two spaces into four.
+    lines = fragment.split("\n")
+    block = "\n".join(
+        [lines[0]] + [indent + line if line else line for line in lines[1:]]
+    )
     return text[:start] + block + text[end:]
 
 
@@ -230,13 +295,20 @@ def write_legacy_index(checkout, addon_id, fragment):
     xml_path = checkout / "addons.xml"
     original = xml_path.read_text(encoding="utf-8")
     updated = replace_addon_block(original, addon_id, fragment)
-    # The plugin listing has to stay byte-for-byte so this commit only moves
-    # the repository add-on.
-    plugin_id = PRIME_ID if addon_id == "repository.primescene" else SMOOTH_ID
-    plugin_marker = '<addon id="%s"' % plugin_id
-    old_plugin = original[original.find(plugin_marker):original.find("</addon>", original.find(plugin_marker)) + len("</addon>")]
-    if old_plugin not in updated:
-        fail("legacy update rewrote %s" % plugin_id)
+    old_blocks = addon_blocks(original)
+    new_blocks = addon_blocks(updated)
+    for kept_id, block in old_blocks.items():
+        if kept_id == addon_id:
+            continue
+        if new_blocks.get(kept_id) != block:
+            fail("legacy update rewrote %s" % kept_id)
+    tag = '<addon id="%s"' % addon_id
+    new_at = updated.find(tag)
+    old_at = original.find(tag)
+    new_indent = updated[updated.rfind("\n", 0, new_at) + 1:new_at]
+    old_indent = original[original.rfind("\n", 0, old_at) + 1:old_at]
+    if new_indent != old_indent:
+        fail("%s opening indent changed from %r to %r" % (addon_id, old_indent, new_indent))
     data = updated.encode("utf-8")
     xml_path.write_bytes(data)
     digest = hashlib.md5(data).hexdigest() + "\n"
@@ -249,7 +321,9 @@ def update_legacy(primescene, smoothflix, built):
     smooth_id = "repository.smoothflix"
     prime_zip = built[prime_id]
     smooth_zip = built[smooth_id]
-    shutil.copyfile(prime_zip, primescene / "packages" / prime_id / prime_zip.name)
+    prime_dest = primescene / "packages" / prime_id / prime_zip.name
+    prime_dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(prime_zip, prime_dest)
     shutil.copyfile(ROOT / prime_id / "addon.xml", primescene / "packages" / prime_id / "addon.xml")
     write_legacy_index(primescene, prime_id, addon_fragment((ROOT / prime_id / "addon.xml").read_text(encoding="utf-8")))
 
@@ -273,27 +347,40 @@ def main():
     smoothflix = args.smoothflix.resolve()
 
     fragments = {}
+    checkouts = (
+        (primescene, SOURCES[0]),
+        (smoothflix, SOURCES[1]),
+    )
+    for repo, source in checkouts:
+        for kind, addon_id, version, payload, text in collect_source(
+            repo, source["raw"], source["zip_prefix"]
+        ):
+            if addon_id in fragments:
+                fail("%s is published by more than one source" % addon_id)
+            filename = "%s-%s.zip" % (addon_id, version)
+            dest_dir = ROOT / addon_id
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest = dest_dir / filename
+            if kind == "zip":
+                write_bytes(dest, payload)
+                print("addon %s %s (%s bytes, copied)" % (addon_id, version, len(payload)))
+            else:
+                zip_directory(payload, dest)
+                packed = read_zip_addon_xml(dest.read_bytes(), addon_id)
+                if addon_id_version(packed) != (addon_id, version):
+                    fail("%s zip does not match its addon.xml" % addon_id)
+                print("addon %s %s (built)" % (addon_id, version))
+            remove_stale_zips(dest_dir, addon_id, filename)
+            fragments[addon_id] = addon_fragment(text)
 
-    prime_filename, prime_data, prime_xml = load_prime_zip(primescene)
-    prime_dir = ROOT / PRIME_ID
-    prime_dir.mkdir(parents=True, exist_ok=True)
-    write_bytes(prime_dir / prime_filename, prime_data)
-    remove_stale_zips(prime_dir, PRIME_ID, prime_filename)
-    fragments[PRIME_ID] = addon_fragment(prime_xml)
-    print("plugin %s %s (%s bytes, copied)" % (PRIME_ID, prime_filename, len(prime_data)))
-
-    smooth_dir, smooth_version, smooth_xml = smooth_source(smoothflix)
-    smooth_filename = "%s-%s.zip" % (SMOOTH_ID, smooth_version)
-    dest_dir = ROOT / SMOOTH_ID
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    # Zip from the source checkout straight into this repository.
-    zip_directory(smooth_dir, dest_dir / smooth_filename)
-    remove_stale_zips(dest_dir, SMOOTH_ID, smooth_filename)
-    packed = read_zip_addon_xml((dest_dir / smooth_filename).read_bytes(), SMOOTH_ID)
-    if addon_id_version(packed) != (SMOOTH_ID, smooth_version):
-        fail("SmoothFlix zip does not match its addon.xml")
-    fragments[SMOOTH_ID] = addon_fragment(smooth_xml)
-    print("plugin %s %s (built)" % (SMOOTH_ID, smooth_version))
+    keep_dirs = set(fragments)
+    for child in list(ROOT.iterdir()):
+        if not child.is_dir() or child.name in keep_dirs or child.name.startswith("."):
+            continue
+        if (child / "addon.xml").is_file():
+            continue
+        if any(child.glob("*.zip")):
+            shutil.rmtree(child)
 
     built = {}
     for addon_id in REPO_ADDONS:
@@ -322,9 +409,12 @@ def main():
     # One parse proves every embedded addon element is well formed.
     root = ET.fromstring(data)
     ids = [element.attrib["id"] for element in root.findall("addon")]
-    expected = sorted([PRIME_ID, SMOOTH_ID, *REPO_ADDONS])
+    expected = sorted(fragments)
     if ids != expected:
         fail("addons.xml lists %s" % ids)
+    for addon_id in REPO_ADDONS:
+        if addon_id not in ids:
+            fail("addons.xml is missing %s" % addon_id)
     write_bytes(ROOT / "addons.xml", data)
     digest = hashlib.md5(data).hexdigest()
     write_bytes(ROOT / "addons.xml.md5", (digest + "\n").encode("utf-8"))

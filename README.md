@@ -1,6 +1,6 @@
 # ScottyWins
 
-Kodi 21 repository for Prime Scene (`plugin.video.primeinterface`) and SmoothFlix (`plugin.video.smoothflix`).
+Kodi 21 repository for Prime Scene (`plugin.video.primeinterface`, `script.primescene.rewrite`) and SmoothFlix (`plugin.video.smoothflix`).
 
 Add `https://agreewithscotty.github.io/ScottyWins` in Kodi's File manager (a trailing slash works too). Install from zip file and choose `/repository.scottywins-1.0.0.zip`. The leading slash is the link text Kodi's directory listing needs so both source URLs resolve. Then install Prime Scene and SmoothFlix from the ScottyWins repository.
 
