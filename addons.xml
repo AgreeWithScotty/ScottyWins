@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addons>
-<addon id="plugin.video.primeinterface" name="Smooth Prime" version="0.2.13" provider-name="AgreeWithScotty">
+<addon id="plugin.video.primeinterface" name="Smooth Prime" version="0.2.17" provider-name="AgreeWithScotty">
   <requires>
     <import addon="xbmc.python" version="3.0.1" />
     <import addon="script.module.beautifulsoup4" version="4.6.3+matrix.1" />
@@ -25,9 +25,9 @@
       <fanart>resources/skins/Default/media/splash.png</fanart>
     </assets>
     <summary lang="en_GB">Smooth Prime: Prime Video in the Aurora Cinema interface</summary>
-    <description lang="en_GB">Smooth Prime is a Prime Video add-on maintained by AgreeWithScotty. Aurora Cinema is the home and player screen. Website sign-in and the storefront reader use your own account. Includes GPL-3.0-or-later backend code derived from Sandmann79/xbmc. See NOTICE.md for upstream credits. Not affiliated with Amazon.</description>
+    <description lang="en_GB">Smooth Prime is a Prime Video add-on maintained by AgreeWithScotty. Aurora Cinema is the home screen. Website sign-in and the storefront reader use your own account. Includes GPL-3.0-or-later backend code derived from Sandmann79/xbmc. See NOTICE.md for upstream credits. Not affiliated with Amazon.</description>
     <disclaimer lang="en_GB">Uses your own Amazon account. Playback uses this add-on's existing player path and Kodi inputstream. Not affiliated with Amazon.</disclaimer>
-    <news>0.2.13[CR]- Use the black-and-white SMOOTH / FOR AMAZON PRIME icon.[CR]- Show that lockup as the add-on fanart and on the home window until the first cards appear.</news>
+    <news>0.2.17[CR]- Removed custom playback control bar; Kodi's standard player controls restored.</news>
   </extension>
 </addon>
 <addon id="plugin.video.smoothflix" name="SmoothFlix" version="0.3.1" provider-name="Scott">
