@@ -4,7 +4,7 @@ The public channel (`addons.xml` at the site root, `repository.scottywins`) is u
 
 The test channel is a separate Kodi repository on the same GitHub Pages site. It lists Smooth Prime (`plugin.video.primeinterface`) from the PrimeScene `testing` branch, plus `repository.scottywins.testing`. It does not list SmoothFlix or the public repository add-ons.
 
-Install in Kodi's File manager from `https://agreewithscotty.github.io/ScottyWins/testing` (a trailing slash works too) and choose `/repository.scottywins.testing-1.0.0.zip`. Direct install zip:
+Install in Kodi's File manager from `https://agreewithscotty.github.io/ScottyWins/testing/` and choose `repository.scottywins.testing-1.0.0.zip`. The trailing slash matters: Kodi appends the filename to the source path. Direct install zip:
 
 https://agreewithscotty.github.io/ScottyWins/testing/repository.scottywins.testing-1.0.0.zip
 
