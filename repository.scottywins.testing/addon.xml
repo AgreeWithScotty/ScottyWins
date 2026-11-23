@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="repository.scottywins.testing" name="ScottyWins Testing" version="1.0.0" provider-name="Scott">
+  <requires>
+    <import addon="xbmc.addon" version="21.0.0"/>
+  </requires>
+  <extension point="xbmc.addon.repository" name="ScottyWins Testing">
+    <dir>
+      <info compressed="false">https://agreewithscotty.github.io/ScottyWins/testing/addons.xml</info>
+      <checksum verify="md5">https://agreewithscotty.github.io/ScottyWins/testing/addons.xml.md5</checksum>
+      <datadir zip="true">https://agreewithscotty.github.io/ScottyWins/testing/</datadir>
+    </dir>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">ScottyWins Testing</summary>
+    <description lang="en_GB">ScottyWins Testing installs and updates Smooth Prime builds from the PrimeScene testing branch on Kodi 21. It does not publish the public channel.</description>
+    <platform>all</platform>
+    <license>GPL-3.0-or-later</license>
+    <source>https://github.com/AgreeWithScotty/ScottyWins</source>
+    <news>1.0.0[CR]- Test channel for Smooth Prime builds from the PrimeScene testing branch.</news>
+    <assets>
+      <icon>icon.png</icon>
+      <fanart>fanart.jpg</fanart>
+    </assets>
+  </extension>
+</addon>

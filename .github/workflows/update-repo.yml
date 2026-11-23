@@ -28,13 +28,28 @@ jobs:
           git -C .sources/PrimeScene sparse-checkout set --no-cone /addons.xml
           git clone --depth 1 --filter=blob:none https://github.com/AgreeWithScotty/SmoothFlix.git .sources/SmoothFlix
 
+      - name: Pull PrimeScene testing
+        id: testing
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/AgreeWithScotty/PrimeScene.git testing >/dev/null; then
+            git clone --depth 1 --branch testing --filter=blob:none --sparse https://github.com/AgreeWithScotty/PrimeScene.git .sources/PrimeScene-testing
+            git -C .sources/PrimeScene-testing sparse-checkout set --no-cone /addons.xml
+            echo "source=.sources/PrimeScene-testing" >> "$GITHUB_OUTPUT"
+          else
+            echo "PrimeScene testing branch does not exist; falling back to main for the test channel."
+            echo "source=.sources/PrimeScene" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Rebuild the repository index
         run: |
           if [ ! -f tools/build_repo.py ]; then
             echo "Builder is not on this branch yet."
             exit 0
           fi
-          python3 tools/build_repo.py --primescene .sources/PrimeScene --smoothflix .sources/SmoothFlix
+          python3 tools/build_repo.py \
+            --primescene .sources/PrimeScene \
+            --smoothflix .sources/SmoothFlix \
+            --testing-primescene "${{ steps.testing.outputs.source }}"
 
       - name: Commit new add-on versions
         run: |
@@ -45,5 +60,5 @@ jobs:
             echo "No add-on changes."
             exit 0
           fi
-          git commit -m "Update repository index from PrimeScene and SmoothFlix."
+          git commit -m "Update public and testing repository indexes."
           git push

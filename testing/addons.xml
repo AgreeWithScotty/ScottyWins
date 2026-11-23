@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addons>
+<addon id="plugin.video.primeinterface" name="Smooth Prime" version="0.2.47" provider-name="AgreeWithScotty">
+  <requires>
+    <import addon="xbmc.python" version="3.0.1" />
+    <import addon="script.module.inputstreamhelper" version="0.8.6" />
+  </requires>
+  <extension point="xbmc.python.script" library="default.py">
+    <provides>video</provides>
+  </extension>
+  <extension point="xbmc.service" library="service.py" />
+  <extension point="xbmc.addon.metadata">
+    <platform>all</platform>
+    <reuselanguageinvoker>false</reuselanguageinvoker>
+    <license>GPL-3.0-only</license>
+    <source>https://github.com/AgreeWithScotty/PrimeScene</source>
+    <assets>
+      <icon>icon.png</icon>
+      <fanart>resources/skins/Default/media/splash.png</fanart>
+    </assets>
+    <summary lang="en_GB">Smooth Prime: Prime Video in the Aurora Cinema interface</summary>
+    <description lang="en_GB">Smooth Prime is maintained by AgreeWithScotty. Catalog, account authentication, HTTPS transport, media resources, Widevine license relay, subtitles and playback lifecycle use independently written implementations. The dedicated Aurora interface is adapted from Scott's SmoothFlix. Not affiliated with Amazon. See NOTICE.md for asset and dependency licenses.</description>
+    <disclaimer lang="en_GB">Uses your own Amazon account and Kodi InputStream Adaptive with Widevine. Not affiliated with Amazon.</disclaimer>
+    <news>0.2.47[CR]- Keep the main title together in the large first line instead of enlarging only its first word.[CR]- Place subtitles below in smaller type, keeping a colon on the main line and a separating dash with the subtitle.[CR]- Wrap long titles without separators at word boundaries with a smaller continuation; keep short titles on one large line.[CR]- Regenerate title artwork with the corrected layout and log the actual line sizes, split rule, cache outcome and render failures.</news>
+  </extension>
+</addon>
+<addon id="repository.scottywins.testing" name="ScottyWins Testing" version="1.0.0" provider-name="Scott">
+  <requires>
+    <import addon="xbmc.addon" version="21.0.0"/>
+  </requires>
+  <extension point="xbmc.addon.repository" name="ScottyWins Testing">
+    <dir>
+      <info compressed="false">https://agreewithscotty.github.io/ScottyWins/testing/addons.xml</info>
+      <checksum verify="md5">https://agreewithscotty.github.io/ScottyWins/testing/addons.xml.md5</checksum>
+      <datadir zip="true">https://agreewithscotty.github.io/ScottyWins/testing/</datadir>
+    </dir>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">ScottyWins Testing</summary>
+    <description lang="en_GB">ScottyWins Testing installs and updates Smooth Prime builds from the PrimeScene testing branch on Kodi 21. It does not publish the public channel.</description>
+    <platform>all</platform>
+    <license>GPL-3.0-or-later</license>
+    <source>https://github.com/AgreeWithScotty/ScottyWins</source>
+    <news>1.0.0[CR]- Test channel for Smooth Prime builds from the PrimeScene testing branch.</news>
+    <assets>
+      <icon>icon.png</icon>
+      <fanart>fanart.jpg</fanart>
+    </assets>
+  </extension>
+</addon>
+</addons>

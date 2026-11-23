@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Rebuild the ScottyWins Kodi repository from the two source checkouts.
+"""Rebuild the ScottyWins Kodi repository from the source checkouts.
+
+The public channel is PrimeScene main and SmoothFlix main. Pass
+--testing-primescene to publish the separate /testing channel from a
+PrimeScene checkout (the testing branch, or main when that branch is
+absent): Smooth Prime and repository.scottywins.testing only.
 
 The script is deterministic: zip entries use a fixed timestamp, mode, and
 file order, and copied release zips are written through unchanged. Only the
@@ -22,6 +27,7 @@ import io
 import os
 import re
 import shutil
+import subprocess
 import sys
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -35,6 +41,13 @@ REPO_ADDONS = (
     "repository.scottywins",
     "repository.smoothflix",
 )
+# The test channel is a separate Pages directory. Public cleanup must leave
+# it alone, and it is not one of REPO_ADDONS, so it never enters addons.xml.
+TESTING_DIR = "testing"
+TESTING_PLUGIN = "plugin.video.primeinterface"
+TESTING_REPO = "repository.scottywins.testing"
+PROTECTED_ROOT_DIRS = {TESTING_DIR}
+PRIME_RAW = "https://raw.githubusercontent.com/AgreeWithScotty/PrimeScene/%s/"
 # Prebuilt zips live under packages/ in PrimeScene and next to the add-on
 # folder in SmoothFlix. Repository add-ons are authored in this repo: their
 # addon.xml versions are the source of truth, and upstream repository.*
@@ -157,18 +170,22 @@ def load_release_zip(repo, addon_id, version, raw_base, zip_prefix):
     return data, text
 
 
-def collect_source(repo, raw_base, zip_prefix):
+def collect_source(repo, raw_base, zip_prefix, include_ids=None):
     """Yield (kind, id, version, payload, addon.xml text) for one checkout.
 
     kind is "zip" (payload is bytes) or "source" (payload is the add-on directory).
     Every non-repository addons.xml entry is included. A directory with its own
     addon.xml is built from that tree; otherwise the published zip is copied.
+    include_ids limits the result to those add-on ids. The public channel
+    leaves it unset.
     """
     listed = listed_addons(repo / "addons.xml")
     seen = set()
     items = []
     for addon_id, version in listed:
         seen.add(addon_id)
+        if include_ids is not None and addon_id not in include_ids:
+            continue
         addon_xml = repo / addon_id / "addon.xml"
         if addon_xml.is_file():
             text = addon_xml.read_text(encoding="utf-8")
@@ -184,6 +201,8 @@ def collect_source(repo, raw_base, zip_prefix):
     for child in sorted(repo.iterdir()):
         if not child.is_dir() or child.name in seen or child.name.startswith("repository."):
             continue
+        if include_ids is not None and child.name not in include_ids:
+            continue
         addon_xml = child / "addon.xml"
         if not addon_xml.is_file():
             continue
@@ -192,6 +211,10 @@ def collect_source(repo, raw_base, zip_prefix):
         if found_id != child.name:
             fail("%s has id %s" % (addon_xml, found_id))
         items.append(("source", found_id, version, child, text))
+    if include_ids is not None:
+        missing = sorted(set(include_ids) - {item[1] for item in items})
+        if missing:
+            fail("%s is missing %s" % (repo, ", ".join(missing)))
     return items
 
 
@@ -229,26 +252,31 @@ def kodi_link_targets(html):
     return found
 
 
-def write_index(zip_name, size_bytes):
+def write_index(zip_name, size_bytes, directory=None, stem="ScottyWins", title="ScottyWins Repository"):
+    if directory is None:
+        directory = ROOT
     kilobytes = max(1, size_bytes // 1024)
     # The anchor is the last line. Kodi's "." does not cross a newline, and
     # the match needs at least one character after </a> before the end.
+    # One leading slash in the href lets Kodi join the zip onto a source with
+    # or without a trailing slash. stem is the final path segment ("ScottyWins"
+    # at the site root, "testing" for the test channel).
     html = (
         "<!doctype html>\n"
         '<html lang="en">\n'
-        '<head><meta charset="utf-8"><title>ScottyWins Repository</title></head>\n'
+        '<head><meta charset="utf-8"><title>%s</title></head>\n'
         "<body>\n"
-        "<h1>ScottyWins Repository</h1>\n"
+        "<h1>%s</h1>\n"
         '<a href="//%s">/%s</a> %dK\n'
-    ) % (zip_name, zip_name, kilobytes)
+    ) % (title, title, zip_name, zip_name, kilobytes)
     targets = kodi_link_targets(html)
     if targets != ["/" + zip_name]:
         fail("index.html is not readable by Kodi's HTTP directory parser: %r" % targets)
-    bare = "ScottyWins" + targets[0]
-    slashed = "ScottyWins/" + targets[0]
-    if bare != "ScottyWins/" + zip_name or slashed != "ScottyWins//" + zip_name:
+    bare = stem + targets[0]
+    slashed = stem + "/" + targets[0]
+    if bare != stem + "/" + zip_name or slashed != stem + "//" + zip_name:
         fail("index.html join check failed: %s / %s" % (bare, slashed))
-    write_bytes(ROOT / "index.html", html.encode("utf-8"))
+    write_bytes(directory / "index.html", html.encode("utf-8"))
 
 
 def addon_blocks(text):
@@ -336,18 +364,175 @@ def update_legacy(primescene, smoothflix, built):
     write_legacy_index(smoothflix, smooth_id, addon_fragment((ROOT / smooth_id / "addon.xml").read_text(encoding="utf-8")))
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Rebuild the ScottyWins Kodi repository.")
-    parser.add_argument("--primescene", required=True, type=Path)
-    parser.add_argument("--smoothflix", required=True, type=Path)
-    parser.add_argument(
-        "--update-legacy",
-        action="store_true",
-        help="Also write the bumped repository add-ons into the source checkouts.",
+def pack_repo_addon(addon_id, dest_dir):
+    """Zip an authored repository add-on. The source tree is ROOT/addon_id."""
+    addon_dir = ROOT / addon_id
+    text = (addon_dir / "addon.xml").read_text(encoding="utf-8")
+    found_id, version = addon_id_version(text)
+    if found_id != addon_id:
+        fail("%s has id %s" % (addon_dir, found_id))
+    filename = "%s-%s.zip" % (addon_id, version)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / filename
+    zip_directory(addon_dir, dest)
+    packed = read_zip_addon_xml(dest.read_bytes(), addon_id)
+    if addon_fragment(packed) != addon_fragment(text):
+        fail("%s zip addon.xml does not match the source" % addon_id)
+    remove_stale_zips(dest_dir, addon_id, filename)
+    return version, dest, addon_fragment(text)
+
+
+def write_addons_xml(directory, fragments, required_ids=()):
+    ordered = [fragments[addon_id] for addon_id in sorted(fragments)]
+    document = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        "<addons>\n" + "\n".join(ordered) + "\n</addons>\n"
     )
-    args = parser.parse_args()
-    primescene = args.primescene.resolve()
-    smoothflix = args.smoothflix.resolve()
+    data = document.encode("utf-8")
+    # One parse proves every embedded addon element is well formed.
+    root = ET.fromstring(data)
+    ids = [element.attrib["id"] for element in root.findall("addon")]
+    expected = sorted(fragments)
+    if ids != expected:
+        fail("addons.xml lists %s" % ids)
+    for addon_id in required_ids:
+        if addon_id not in ids:
+            fail("addons.xml is missing %s" % addon_id)
+    write_bytes(directory / "addons.xml", data)
+    digest = hashlib.md5(data).hexdigest()
+    write_bytes(directory / "addons.xml.md5", (digest + "\n").encode("utf-8"))
+    return root, digest, expected
+
+
+def git_branch(repo):
+    try:
+        out = subprocess.check_output(
+            ["git", "-C", str(repo), "rev-parse", "--abbrev-ref", "HEAD"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return ""
+    if out == "HEAD":
+        return ""
+    return out
+
+
+def version_key(version):
+    """Order dotted Kodi add-on versions. Numeric pieces compare as integers."""
+    parts = []
+    for part in version.split("."):
+        if part.isdigit():
+            parts.append((0, int(part)))
+        else:
+            parts.append((1, part))
+    return tuple(parts)
+
+
+def published_version(addon_id, directory=None):
+    xml_path = (directory or ROOT) / "addons.xml"
+    if not xml_path.is_file():
+        return None
+    element = ET.parse(xml_path).getroot().find("addon[@id='%s']" % addon_id)
+    if element is None:
+        return None
+    return element.attrib.get("version")
+
+
+def build_testing_channel(primescene):
+    """Publish Smooth Prime and the testing repo add-on under /testing.
+
+    The checkout's branch selects the raw zip URL, so the zip matches
+    addons.xml. A checkout that is not on testing is reported; the workflow
+    only passes main in that case, and only when the testing branch is absent.
+    """
+    primescene = primescene.resolve()
+    branch = git_branch(primescene)
+    if not branch:
+        fail(
+            "%s is not on a named branch. Clone --branch testing, or --branch main "
+            "when the testing branch does not exist yet." % primescene
+        )
+    if branch != "testing":
+        print(
+            "note: PrimeScene testing branch is not checked out (branch is %s). "
+            "Building the test channel from %s. This fallback is for a missing "
+            "testing branch; push to testing before relying on the test channel."
+            % (branch, branch),
+            file=sys.stderr,
+        )
+    raw = PRIME_RAW % branch
+    output = ROOT / TESTING_DIR
+    fragments = {}
+    plugin_version = None
+    for kind, addon_id, version, payload, text in collect_source(
+        primescene, raw, "packages/", include_ids={TESTING_PLUGIN}
+    ):
+        if addon_id in fragments:
+            fail("%s is published by more than one source" % addon_id)
+        filename = "%s-%s.zip" % (addon_id, version)
+        dest_dir = output / addon_id
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / filename
+        if kind == "zip":
+            write_bytes(dest, payload)
+            print("testing addon %s %s (%s bytes, copied)" % (addon_id, version, len(payload)))
+        else:
+            zip_directory(payload, dest)
+            packed = read_zip_addon_xml(dest.read_bytes(), addon_id)
+            if addon_id_version(packed) != (addon_id, version):
+                fail("%s zip does not match its addon.xml" % addon_id)
+            print("testing addon %s %s (built)" % (addon_id, version))
+        remove_stale_zips(dest_dir, addon_id, filename)
+        fragments[addon_id] = addon_fragment(text)
+        plugin_version = version
+
+    public_version = published_version(TESTING_PLUGIN)
+    if public_version and version_key(plugin_version) <= version_key(public_version):
+        print(
+            "warning: %s testing version %s is not newer than public %s. "
+            "Kodi offers an update only when the testing version is greater. "
+            "Bump plugin.video.primeinterface on the PrimeScene testing branch. "
+            "See TESTING.md."
+            % (TESTING_PLUGIN, plugin_version, public_version),
+            file=sys.stderr,
+        )
+
+    # Pack straight into the test datadir. The source folder stays free of the
+    # zip; Kodi installs that zip from /testing, not from the add-on folder.
+    version, dest, fragment = pack_repo_addon(TESTING_REPO, output / TESTING_REPO)
+    fragments[TESTING_REPO] = fragment
+    print("testing repo %s %s" % (TESTING_REPO, version))
+    install_zip = output / dest.name
+    write_bytes(install_zip, dest.read_bytes())
+    for stale in output.glob("%s-*.zip" % TESTING_REPO):
+        if stale.name != dest.name:
+            stale.unlink()
+
+    for child in list(output.iterdir()) if output.is_dir() else []:
+        if child.is_dir() and child.name not in {TESTING_PLUGIN, TESTING_REPO}:
+            shutil.rmtree(child)
+
+    root, digest, expected = write_addons_xml(
+        output, fragments, (TESTING_PLUGIN, TESTING_REPO)
+    )
+    write_index(
+        dest.name,
+        install_zip.stat().st_size,
+        directory=output,
+        stem=TESTING_DIR,
+        title="ScottyWins Testing",
+    )
+    print("testing addons.xml md5 %s" % digest)
+    print("testing install zip %s/%s/%s" % (PAGES, TESTING_DIR, dest.name))
+    for addon_id in expected:
+        element = root.find("addon[@id='%s']" % addon_id)
+        print("testing listed %s %s" % (addon_id, element.attrib["version"]))
+
+
+def build_public(primescene, smoothflix, update_legacy_repos):
+    primescene = primescene.resolve()
+    smoothflix = smoothflix.resolve()
 
     fragments = {}
     checkouts = (
@@ -380,6 +565,8 @@ def main():
     for child in list(ROOT.iterdir()):
         if not child.is_dir() or child.name in keep_dirs or child.name.startswith("."):
             continue
+        if child.name in PROTECTED_ROOT_DIRS:
+            continue
         if (child / "addon.xml").is_file():
             continue
         if any(child.glob("*.zip")):
@@ -387,40 +574,12 @@ def main():
 
     built = {}
     for addon_id in REPO_ADDONS:
-        addon_dir = ROOT / addon_id
-        text = (addon_dir / "addon.xml").read_text(encoding="utf-8")
-        found_id, version = addon_id_version(text)
-        if found_id != addon_id:
-            fail("%s has id %s" % (addon_dir, found_id))
-        filename = "%s-%s.zip" % (addon_id, version)
-        dest = addon_dir / filename
-        zip_directory(addon_dir, dest)
-        packed = read_zip_addon_xml(dest.read_bytes(), addon_id)
-        if addon_fragment(packed) != addon_fragment(text):
-            fail("%s zip addon.xml does not match the source" % addon_id)
-        remove_stale_zips(addon_dir, addon_id, filename)
-        fragments[addon_id] = addon_fragment(text)
+        version, dest, fragment = pack_repo_addon(addon_id, ROOT / addon_id)
+        fragments[addon_id] = fragment
         built[addon_id] = dest
         print("repo %s %s" % (addon_id, version))
 
-    ordered = [fragments[addon_id] for addon_id in sorted(fragments)]
-    document = (
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-        "<addons>\n" + "\n".join(ordered) + "\n</addons>\n"
-    )
-    data = document.encode("utf-8")
-    # One parse proves every embedded addon element is well formed.
-    root = ET.fromstring(data)
-    ids = [element.attrib["id"] for element in root.findall("addon")]
-    expected = sorted(fragments)
-    if ids != expected:
-        fail("addons.xml lists %s" % ids)
-    for addon_id in REPO_ADDONS:
-        if addon_id not in ids:
-            fail("addons.xml is missing %s" % addon_id)
-    write_bytes(ROOT / "addons.xml", data)
-    digest = hashlib.md5(data).hexdigest()
-    write_bytes(ROOT / "addons.xml.md5", (digest + "\n").encode("utf-8"))
+    root, digest, expected = write_addons_xml(ROOT, fragments, REPO_ADDONS)
 
     repo_zip = built["repository.scottywins"]
     root_zip = ROOT / repo_zip.name
@@ -438,8 +597,33 @@ def main():
         element = root.find("addon[@id='%s']" % addon_id)
         print("listed %s %s" % (addon_id, element.attrib["version"]))
 
-    if args.update_legacy:
+    if update_legacy_repos:
         update_legacy(primescene, smoothflix, built)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Rebuild the ScottyWins Kodi repository.")
+    parser.add_argument("--primescene", type=Path)
+    parser.add_argument("--smoothflix", type=Path)
+    parser.add_argument(
+        "--testing-primescene",
+        type=Path,
+        help="PrimeScene checkout for the /testing channel. Branch testing is the test channel; any other branch is reported and used only as the missing-branch fallback.",
+    )
+    parser.add_argument(
+        "--update-legacy",
+        action="store_true",
+        help="Also write the bumped repository add-ons into the source checkouts.",
+    )
+    args = parser.parse_args()
+    if bool(args.primescene) != bool(args.smoothflix):
+        fail("public build needs both --primescene and --smoothflix")
+    if not args.primescene and not args.testing_primescene:
+        fail("pass --primescene and --smoothflix, or --testing-primescene")
+    if args.primescene:
+        build_public(args.primescene, args.smoothflix, args.update_legacy)
+    if args.testing_primescene:
+        build_testing_channel(args.testing_primescene)
 
 
 if __name__ == "__main__":
