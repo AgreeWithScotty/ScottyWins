@@ -22,9 +22,11 @@ jobs:
           persist-credentials: true
           fetch-depth: 1
 
-      - name: Pull PrimeScene and SmoothFlix main
+      - name: Pull PrimeScene release and SmoothFlix main
         run: |
-          git clone --depth 1 --filter=blob:none --sparse https://github.com/AgreeWithScotty/PrimeScene.git .sources/PrimeScene
+          # Missing release fails this step. The job then does not commit, so
+          # the published public files stay as they are. Do not fall back to main.
+          git clone --depth 1 --branch release --filter=blob:none --sparse https://github.com/AgreeWithScotty/PrimeScene.git .sources/PrimeScene
           git -C .sources/PrimeScene sparse-checkout set --no-cone /addons.xml
           git clone --depth 1 --filter=blob:none https://github.com/AgreeWithScotty/SmoothFlix.git .sources/SmoothFlix
 
@@ -37,7 +39,9 @@ jobs:
             echo "source=.sources/PrimeScene-testing" >> "$GITHUB_OUTPUT"
           else
             echo "PrimeScene testing branch does not exist; falling back to main for the test channel."
-            echo "source=.sources/PrimeScene" >> "$GITHUB_OUTPUT"
+            git clone --depth 1 --branch main --filter=blob:none --sparse https://github.com/AgreeWithScotty/PrimeScene.git .sources/PrimeScene-testing
+            git -C .sources/PrimeScene-testing sparse-checkout set --no-cone /addons.xml
+            echo "source=.sources/PrimeScene-testing" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Rebuild the repository index

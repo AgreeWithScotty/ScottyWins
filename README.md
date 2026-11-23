@@ -8,13 +8,25 @@ An existing Prime Scene Repository or SmoothFlix Repository updates in place and
 
 ## Release flow
 
-On `main`, bump Prime Scene by publishing the new zip and `addons.xml`, or bump SmoothFlix in `plugin.video.smoothflix/addon.xml`. The Update repository action runs daily at 06:17 UTC and from Actions, Run workflow. It pulls both `main` branches, keeps the latest zip of each add-on, and commits `addons.xml` and `addons.xml.md5`. Kodi installs that update.
+New Smooth Prime builds go to the PrimeScene `testing` branch first. The public channel publishes Smooth Prime only from the PrimeScene `release` branch, and SmoothFlix from SmoothFlix `main`. It does not read PrimeScene `main`. The Update repository action runs daily at 06:17 UTC and from Actions, Run workflow. If `release` does not exist, that action fails and the files already on the site stay as they are.
 
-Rebuild locally with:
+Rebuild locally with a checkout of PrimeScene `release`:
 
 ```bash
-python3 tools/build_repo.py --primescene /path/to/PrimeScene --smoothflix /path/to/SmoothFlix
+python3 tools/build_repo.py --primescene /path/to/PrimeScene-release --smoothflix /path/to/SmoothFlix
 ```
+
+## Promote
+
+This makes PrimeScene `release` match `testing`, then publishes that commit on the public channel.
+
+1. Open https://github.com/AgreeWithScotty/PrimeScene/compare/release...testing
+2. Confirm the base branch is `release` and the compare branch is `testing`.
+3. Click **Create pull request**.
+4. Click **Create pull request** again.
+5. Click **Merge pull request**, then **Confirm merge**.
+6. Open https://github.com/AgreeWithScotty/ScottyWins/actions/workflows/update-repo.yml
+7. Click **Run workflow**. Leave the branch set to `main`. Click **Run workflow**.
 
 ## Testing channel
 

@@ -1,6 +1,6 @@
 # ScottyWins Testing
 
-The public channel (`addons.xml` at the site root, `repository.scottywins`) is unchanged. It still builds only from PrimeScene `main` and SmoothFlix `main`.
+The public channel (`addons.xml` at the site root, `repository.scottywins`) builds Smooth Prime from the PrimeScene `release` branch and SmoothFlix from SmoothFlix `main`. It does not read PrimeScene `main`.
 
 The test channel is a separate Kodi repository on the same GitHub Pages site. It lists Smooth Prime (`plugin.video.primeinterface`) from the PrimeScene `testing` branch, plus `repository.scottywins.testing`. It does not list SmoothFlix or the public repository add-ons.
 
@@ -30,7 +30,7 @@ If `testing` does not exist yet, create it from current `main` with no other cha
 
 ## Rebuild the test channel
 
-The Update repository action (daily at 06:17 UTC, and Actions → Run workflow) pulls PrimeScene `main`, SmoothFlix `main`, and PrimeScene `testing`, then rebuilds both channels. When `testing` does not exist, the action says so and builds the test channel from PrimeScene `main`.
+The Update repository action (daily at 06:17 UTC, and Actions → Run workflow) pulls PrimeScene `release`, SmoothFlix `main`, and PrimeScene `testing`, then rebuilds both channels. When `testing` does not exist, the action says so and builds the test channel from PrimeScene `main`. When `release` does not exist, the action fails and the published public files stay as they are.
 
 Test channel only, which does not rewrite the public index:
 
@@ -44,15 +44,15 @@ Public and test together:
 
 ```bash
 python3 tools/build_repo.py \
-  --primescene /path/to/PrimeScene-main \
+  --primescene /path/to/PrimeScene-release \
   --smoothflix /path/to/SmoothFlix \
   --testing-primescene /path/to/PrimeScene-testing
 ```
 
-The test output is `testing/addons.xml`, `testing/addons.xml.md5`, the zips under `testing/`, and `testing/index.html` (the File manager link). Commit those files. The public root files stay on the main-branch inputs only.
+The test output is `testing/addons.xml`, `testing/addons.xml.md5`, the zips under `testing/`, and `testing/index.html` (the File manager link). Commit those files. The public root files come from PrimeScene `release` and SmoothFlix `main` only.
 
 ## Promote to the public channel
 
-Publish that Smooth Prime release on PrimeScene `main` (merge `testing` into `main`, or push the same zip and `addons.xml` there). The next public rebuild reads PrimeScene `main` and SmoothFlix `main` only. It does not copy `testing/addons.xml` onto the public index.
+Follow the Promote steps in the ScottyWins README: open a pull request from PrimeScene `testing` into `release`, use **Merge pull request**, then run the Update repository workflow. The public rebuild does not copy `testing/addons.xml` onto the public index.
 
 After the public channel is serving that version, the next test build needs a higher `X.Y.Z` again.
