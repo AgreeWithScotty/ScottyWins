@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 """Rebuild the ScottyWins Kodi repository from the source checkouts.
 
-The public channel is PrimeScene main and SmoothFlix main. Pass
---testing-primescene to publish the separate /testing channel from a
-PrimeScene checkout (the testing branch, or main when that branch is
-absent): Smooth Prime and repository.scottywins.testing only.
+The public channel reads PrimeScene release and SmoothFlix main. It does
+not read PrimeScene main. Pass --testing-primescene to publish the separate
+/testing channel from a PrimeScene checkout (the testing branch, or main
+when that branch is absent): Smooth Prime and repository.scottywins.testing
+only.
 
 The script is deterministic: zip entries use a fixed timestamp, mode, and
 file order, and copied release zips are written through unchanged. Only the
@@ -47,6 +48,9 @@ TESTING_PLUGIN = "plugin.video.primeinterface"
 TESTING_REPO = "repository.scottywins.testing"
 PROTECTED_ROOT_DIRS = {TESTING_DIR}
 PRIME_RAW = "https://raw.githubusercontent.com/AgreeWithScotty/PrimeScene/%s/"
+# Public Smooth Prime comes from this branch only. main is where new builds
+# land first; publishing it would skip the test channel.
+PRIME_PUBLIC_BRANCH = "release"
 # Prebuilt zips live under packages/ in PrimeScene and next to the add-on
 # folder in SmoothFlix. Repository add-ons are authored in this repo: their
 # addon.xml versions are the source of truth, and upstream repository.*
@@ -54,7 +58,7 @@ PRIME_RAW = "https://raw.githubusercontent.com/AgreeWithScotty/PrimeScene/%s/"
 KEEP_ROOT_ZIPS = ("repository.scottywins-1.0.0.zip",)
 SOURCES = (
     {
-        "raw": "https://raw.githubusercontent.com/AgreeWithScotty/PrimeScene/main/",
+        "raw": PRIME_RAW % PRIME_PUBLIC_BRANCH,
         "zip_prefix": "packages/",
     },
     {
@@ -560,6 +564,13 @@ def build_testing_channel(primescene):
 def build_public(primescene, smoothflix, update_legacy_repos):
     primescene = primescene.resolve()
     smoothflix = smoothflix.resolve()
+    branch = git_branch(primescene)
+    if branch != PRIME_PUBLIC_BRANCH:
+        fail(
+            "public channel reads PrimeScene %s, but %s is on %s. "
+            "Not using main. Published files were left unchanged."
+            % (PRIME_PUBLIC_BRANCH, primescene, branch or "no branch")
+        )
 
     fragments = {}
     checkouts = (
