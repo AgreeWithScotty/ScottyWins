@@ -12,13 +12,11 @@ file order, and copied release zips are written through unchanged. Only the
 latest version of each add-on is kept.
 
 Kodi's HTTP directory parser (HTTPDirectory.cpp) keeps an <a href> only when
-the link text equals the href, and it joins that href onto the source path
-with plain concatenation. A source without a trailing slash would glue the
-zip name onto "ScottyWins". The index therefore uses one leading slash in
-the href so both of these list the zip:
-
-  https://agreewithscotty.github.io/ScottyWins
-  https://agreewithscotty.github.io/ScottyWins/
+the link text equals the href. A href that starts with "//" is protocol-relative:
+it names a host, so the zip never appears in the folder. The indexes are Apache
+HTML listings whose href and label are the zip filename. Kodi appends that
+filename to the directory path, which is why the source URL needs its trailing
+slash (Pages redirects the bare URL onto that form).
 """
 
 import argparse
@@ -29,6 +27,7 @@ import re
 import shutil
 import subprocess
 import sys
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
@@ -67,9 +66,10 @@ ZIP_DATE = (1980, 1, 1, 0, 0, 0)
 SKIP_DIRS = {"__pycache__", ".git"}
 SKIP_SUFFIXES = (".zip", ".pyc", ".pyo", ".tmp")
 # Same expression Kodi compiles in CHTTPDirectory::GetDirectory.
+# Kodi's CRegExp sets PCRE_DOTALL, so "." crosses newlines.
 KODI_LINK = re.compile(
     r'<a href="([^"]*)"[^>]*>\s*(.*?)\s*</a>(.+?)(?=<a|</tr|$)',
-    re.IGNORECASE,
+    re.IGNORECASE | re.DOTALL,
 )
 
 
@@ -234,7 +234,13 @@ def remove_stale_zips(folder, addon_id, filename):
 
 
 def kodi_link_targets(html):
-    """Return hrefs Kodi would keep, after its one-character slash strip."""
+    """Return hrefs Kodi's HTTP directory parser would keep.
+
+    Mirrors CHTTPDirectory::GetDirectory: one leading slash is stripped, then
+    the link text has to equal that href. "//file.zip" is left as "/file.zip"
+    and only matches a label that still has the slash; a plain "file.zip"
+    matches itself.
+    """
     found = []
     for match in KODI_LINK.finditer(html):
         href = match.group(1)
@@ -252,30 +258,57 @@ def kodi_link_targets(html):
     return found
 
 
-def write_index(zip_name, size_bytes, directory=None, stem="ScottyWins", title="ScottyWins Repository"):
+def write_index(zip_name, size_bytes, directory=None):
+    """Write an Apache HTML listing Kodi parses. The href is the zip filename."""
     if directory is None:
         directory = ROOT
+    if directory == ROOT:
+        index_of = "/ScottyWins"
+        folder_url = PAGES + "/"
+    else:
+        rel = directory.relative_to(ROOT).as_posix().strip("/")
+        index_of = "/ScottyWins/" + rel
+        folder_url = "%s/%s/" % (PAGES, rel)
+    if zip_name.startswith(("/", ".")) or "/" in zip_name or "\\" in zip_name:
+        fail("index href must be a plain filename, not %s" % zip_name)
     kilobytes = max(1, size_bytes // 1024)
-    # The anchor is the last line. Kodi's "." does not cross a newline, and
-    # the match needs at least one character after </a> before the end.
-    # One leading slash in the href lets Kodi join the zip onto a source with
-    # or without a trailing slash. stem is the final path segment ("ScottyWins"
-    # at the site root, "testing" for the test channel).
+    # Same table shape as the apache-html listing in Kodi's HTTPDirectory tests.
+    # Column-sort links are kept out of the result because their labels differ
+    # from their hrefs. The zip row's label and href are both the filename.
     html = (
-        "<!doctype html>\n"
-        '<html lang="en">\n'
-        '<head><meta charset="utf-8"><title>%s</title></head>\n'
-        "<body>\n"
-        "<h1>%s</h1>\n"
-        '<a href="//%s">/%s</a> %dK\n'
-    ) % (title, title, zip_name, zip_name, kilobytes)
+        '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">\n'
+        "<html>\n"
+        " <head>\n"
+        "  <title>Index of %s</title>\n"
+        " </head>\n"
+        " <body>\n"
+        "<h1>Index of %s</h1>\n"
+        "  <table>\n"
+        '   <tr><th valign="top">&nbsp;</th><th><a href="?C=N;O=D">Name</a></th>'
+        '<th><a href="?C=M;O=A">Last modified</a></th>'
+        '<th><a href="?C=S;O=A">Size</a></th>'
+        '<th><a href="?C=D;O=A">Description</a></th></tr>\n'
+        '   <tr><th colspan="5"><hr></th></tr>\n'
+        '<tr><td valign="top">&nbsp;</td><td><a href="%s">%s</a></td>'
+        '<td align="right">1980-01-01 00:00  </td>'
+        '<td align="right"> %dK</td><td>&nbsp;</td></tr>\n'
+        '   <tr><th colspan="5"><hr></th></tr>\n'
+        "</table>\n"
+        "</body></html>\n"
+    ) % (index_of, index_of, zip_name, zip_name, kilobytes)
     targets = kodi_link_targets(html)
-    if targets != ["/" + zip_name]:
-        fail("index.html is not readable by Kodi's HTTP directory parser: %r" % targets)
-    bare = stem + targets[0]
-    slashed = stem + "/" + targets[0]
-    if bare != stem + "/" + zip_name or slashed != stem + "//" + zip_name:
-        fail("index.html join check failed: %s / %s" % (bare, slashed))
+    if targets != [zip_name]:
+        fail("index.html is not readable by Kodi's HTTP directory parser: %r" % (targets,))
+    resolved = urllib.parse.urljoin(folder_url, zip_name)
+    if resolved != folder_url + zip_name:
+        fail("index.html href does not resolve under %s: %s" % (folder_url, resolved))
+    # Kodi concatenates the href onto the directory path from GetFileName().
+    # Pages serves the folder with a trailing slash, and that slash is the
+    # separator this join needs.
+    directory_path = folder_url.split("://", 1)[1].split("/", 1)[1]
+    kodi_url = "https://agreewithscotty.github.io/" + directory_path + targets[0]
+    if kodi_url != resolved:
+        fail("Kodi would request %s instead of %s" % (kodi_url, resolved))
     write_bytes(directory / "index.html", html.encode("utf-8"))
 
 
@@ -516,13 +549,7 @@ def build_testing_channel(primescene):
     root, digest, expected = write_addons_xml(
         output, fragments, (TESTING_PLUGIN, TESTING_REPO)
     )
-    write_index(
-        dest.name,
-        install_zip.stat().st_size,
-        directory=output,
-        stem=TESTING_DIR,
-        title="ScottyWins Testing",
-    )
+    write_index(dest.name, install_zip.stat().st_size, directory=output)
     print("testing addons.xml md5 %s" % digest)
     print("testing install zip %s/%s/%s" % (PAGES, TESTING_DIR, dest.name))
     for addon_id in expected:
