@@ -30,4 +30,4 @@ This makes PrimeScene `release` match `testing`, then publishes that commit on t
 
 ## Testing channel
 
-Smooth Prime builds from the PrimeScene `testing` branch are a separate repository, `repository.scottywins.testing`, under `/testing`. The public files above are not part of that channel. Install zip: `https://agreewithscotty.github.io/ScottyWins/testing/repository.scottywins.testing-1.0.0.zip`. See [TESTING.md](TESTING.md).
+Smooth Prime builds from the PrimeScene `testing` branch are a separate repository, `repository.scottywins.testing`, under `/testing`. The public files above are not part of that channel. Install zip: `https://agreewithscotty.github.io/ScottyWins/testing/repository.scottywins.testing-1.0.1.zip`. The 1.0.0 zip remains there for the original install link. See [TESTING.md](TESTING.md).

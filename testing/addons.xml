@@ -24,7 +24,7 @@
     <news>0.2.58[CR]- Load genre backgrounds from Amazon at startup and remove all bundled genre photos.[CR]- Keep the splash visible for at least three seconds and until the initial Movies and TV backdrops are cached.[CR]- Preload original movie/show hero images in a separate queue; avoid stretched cover thumbnails.[CR]- Keep the expanded genre card steady when focus enters from the top menu.[CR]- Allow Back to cancel startup, and report artwork readiness, dimensions, request stages and failures.</news>
   </extension>
 </addon>
-<addon id="repository.scottywins.testing" name="ScottyWins Testing" version="1.0.0" provider-name="Scott">
+<addon id="repository.scottywins.testing" name="ScottyWins Testing" version="1.0.1" provider-name="Scott">
   <requires>
     <import addon="xbmc.addon" version="21.0.0"/>
   </requires>
@@ -32,7 +32,8 @@
     <dir>
       <info compressed="false">https://agreewithscotty.github.io/ScottyWins/testing/addons.xml</info>
       <checksum verify="md5">https://agreewithscotty.github.io/ScottyWins/testing/addons.xml.md5</checksum>
-      <datadir zip="true">https://agreewithscotty.github.io/ScottyWins/testing/</datadir>
+      <datadir zip="true">https://github.com/AgreeWithScotty/ScottyWins/releases/download/</datadir>
+      <artdir>https://agreewithscotty.github.io/ScottyWins/testing/</artdir>
     </dir>
   </extension>
   <extension point="xbmc.addon.metadata">
@@ -41,7 +42,7 @@
     <platform>all</platform>
     <license>GPL-3.0-or-later</license>
     <source>https://github.com/AgreeWithScotty/ScottyWins</source>
-    <news>1.0.0[CR]- Test channel for Smooth Prime builds from the PrimeScene testing branch.</news>
+    <news>1.0.1[CR]- Smooth Prime test packages download from GitHub Release assets so each version has a download count. The add-on index, icons, and fanart stay on this site.</news>
     <assets>
       <icon>icon.png</icon>
       <fanart>fanart.jpg</fanart>

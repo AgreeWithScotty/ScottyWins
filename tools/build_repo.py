@@ -8,6 +8,12 @@ not read PrimeScene main. Pass --testing-primescene to publish the separate
 when that branch is absent): Smooth Prime and repository.scottywins.testing
 only.
 
+The testing repository datadir is the GitHub Release download prefix.
+Kodi requests datadir + "<id>/<id>-<version>.zip", which is one release
+asset whose tag is the add-on id. Icon and fanart stay on the Pages
+artdir. The Pages copy of each zip is still written for clients whose
+installed testing repository has not updated yet.
+
 The script is deterministic: zip entries use a fixed timestamp, mode, and
 file order, and copied release zips are written through unchanged. Only the
 latest version of each add-on is kept.
@@ -46,6 +52,17 @@ REPO_ADDONS = (
 TESTING_DIR = "testing"
 TESTING_PLUGIN = "plugin.video.primeinterface"
 TESTING_REPO = "repository.scottywins.testing"
+# Kodi Omega builds the zip URL in AddonInfoBuilder as
+# datadir + "<id>/<id>-<version>.zip". With this prefix the tag is the
+# add-on id and the asset name is the zip. An absolute <path> is not used:
+# AddFileToFolder appends it to the datadir, and ResolvePathAndHash rejects
+# a zip that is not under the datadir.
+RELEASE_DOWNLOAD_DATADIR = "https://github.com/AgreeWithScotty/ScottyWins/releases/download/"
+# artdir defaults to datadir. Keep artwork on Pages, where the paths in
+# <assets> already point (including fanart paths that contain slashes).
+TESTING_ARTDIR = PAGES + "/testing/"
+# File manager install link published before the datadir change.
+TESTING_KEEP_ROOT_ZIPS = ("repository.scottywins.testing-1.0.0.zip",)
 PROTECTED_ROOT_DIRS = {TESTING_DIR}
 PRIME_RAW = "https://raw.githubusercontent.com/AgreeWithScotty/PrimeScene/%s/"
 # Public Smooth Prime comes from this branch only. main is where new builds
@@ -80,6 +97,180 @@ KODI_LINK = re.compile(
 def fail(message):
     print("error: %s" % message, file=sys.stderr)
     raise SystemExit(1)
+
+
+def _curl_parts(url):
+    """Split an http(s) URL the way Kodi's CURL::Parse does.
+
+    The filename is the path without its leading slash. Query and fragment
+    are not used for repository datadir URLs.
+    """
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc or parsed.query or parsed.fragment:
+        return None
+    path = parsed.path[1:] if parsed.path.startswith("/") else parsed.path
+    return parsed.scheme, parsed.netloc, path
+
+
+def kodi_add_slash_at_end(folder):
+    """Mirror URIUtils::AddSlashAtEnd for the datadir parent check."""
+    parts = _curl_parts(folder) if "://" in folder else None
+    if parts is not None:
+        scheme, host, path = parts
+        if path and path != folder:
+            path = kodi_add_slash_at_end(path)
+            return "%s://%s/%s" % (scheme, host, path)
+        return folder
+    if folder.endswith("/") or folder.endswith("\\"):
+        return folder
+    return folder + "/"
+
+
+def kodi_add_file_to_folder(folder, filename):
+    """Mirror URIUtils::AddFileToFolder. An absolute filename is appended."""
+    parts = _curl_parts(folder) if "://" in folder else None
+    if parts is not None:
+        scheme, host, path = parts
+        if path != folder:
+            new_file = kodi_add_file_to_folder(path, filename)
+            base = "%s://%s/" % (scheme, host)
+            if new_file.startswith("/") and base.endswith("/"):
+                return base[:-1] + new_file
+            return base + new_file
+    result = folder
+    if result and not result.endswith("/") and not result.endswith("\\"):
+        result += "/"
+    if filename.startswith("/") or filename.startswith("\\"):
+        result += filename[1:]
+    else:
+        result += filename
+    if not (len(folder) > 1 and folder[1] == ":" and folder[0].isalpha()):
+        result = result.replace("\\", "/")
+    return result
+
+
+def kodi_zip_url(datadir, addon_id, version):
+    """The zip URL CAddonInfoBuilder stores when metadata has no <path>."""
+    filename = "%s-%s.zip" % (addon_id, version)
+    return kodi_add_file_to_folder(kodi_add_file_to_folder(datadir, addon_id), filename)
+
+
+def kodi_path_has_parent(path, parent):
+    """Mirror URIUtils::PathHasParent without special:// translation."""
+    if not parent:
+        return False
+    if path == parent:
+        return True
+    parent = kodi_add_slash_at_end(parent)
+    return path.startswith(parent)
+
+
+def check_kodi_url_rules():
+    """Lock the Omega URL rules this feed depends on."""
+    addon_id = "plugin.video.primeinterface"
+    version = "1.2.3"
+    expected = "%s%s/%s-%s.zip" % (RELEASE_DOWNLOAD_DATADIR, addon_id, addon_id, version)
+    url = kodi_zip_url(RELEASE_DOWNLOAD_DATADIR, addon_id, version)
+    if url != expected:
+        fail("kodi zip url %s != %s" % (url, expected))
+    bare = RELEASE_DOWNLOAD_DATADIR.rstrip("/")
+    if kodi_zip_url(bare, addon_id, version) != expected:
+        fail("datadir without a trailing slash did not join to %s" % expected)
+    if not kodi_path_has_parent(url, RELEASE_DOWNLOAD_DATADIR):
+        fail("release zip is not under the release datadir")
+    if not kodi_path_has_parent(url, bare):
+        fail("release zip is not under the release datadir without a slash")
+    # <path>https://...</path> is appended to the datadir path. It does not
+    # replace it, so it cannot name a GitHub Release from a Pages datadir.
+    joined = kodi_add_file_to_folder(TESTING_ARTDIR, url)
+    if joined != TESTING_ARTDIR + url:
+        fail("absolute <path> joined as %s" % joined)
+    if kodi_path_has_parent(url, TESTING_ARTDIR):
+        fail("release zip was treated as a child of the Pages datadir")
+    if not kodi_path_has_parent(joined, TESTING_ARTDIR):
+        fail("joined absolute <path> escaped the Pages datadir")
+    icon = kodi_add_file_to_folder(kodi_add_file_to_folder(TESTING_ARTDIR, addon_id), "icon.png")
+    if icon != TESTING_ARTDIR + addon_id + "/icon.png":
+        fail("icon url %s" % icon)
+    fanart_rel = "resources/skins/Default/media/splash.png"
+    fanart = kodi_add_file_to_folder(
+        kodi_add_file_to_folder(TESTING_ARTDIR, addon_id), fanart_rel
+    )
+    if fanart != TESTING_ARTDIR + addon_id + "/" + fanart_rel:
+        fail("fanart url %s" % fanart)
+    if kodi_path_has_parent(fanart, RELEASE_DOWNLOAD_DATADIR):
+        fail("fanart url was placed on the release datadir")
+    return url
+
+
+def repository_dirs(fragment):
+    """info, checksum, datadir, and artdir from one repository add-on element."""
+    root = ET.fromstring(fragment.encode("utf-8"))
+    for ext in root.findall("extension"):
+        if ext.attrib.get("point") != "xbmc.addon.repository":
+            continue
+        found = {}
+        for name in ("info", "checksum", "datadir", "artdir"):
+            node = ext.find("dir/%s" % name)
+            found[name] = node.text.strip() if node is not None and node.text else ""
+        return found
+    return None
+
+
+def metadata_path_text(fragment):
+    root = ET.fromstring(fragment.encode("utf-8"))
+    for ext in root.findall("extension"):
+        if ext.attrib.get("point") not in ("xbmc.addon.metadata", "kodi.addon.metadata"):
+            continue
+        node = ext.find("path")
+        if node is not None and node.text and node.text.strip():
+            return node.text.strip()
+    return ""
+
+
+def metadata_assets(fragment):
+    root = ET.fromstring(fragment.encode("utf-8"))
+    found = {}
+    for ext in root.findall("extension"):
+        if ext.attrib.get("point") not in ("xbmc.addon.metadata", "kodi.addon.metadata"):
+            continue
+        assets = ext.find("assets")
+        if assets is None:
+            continue
+        for child in list(assets):
+            if child.text and child.text.strip():
+                found[child.tag] = child.text.strip()
+    return found
+
+
+def release_asset_from_datadir(datadir, addon_id, version):
+    """Return (zip URL, tag, filename) for one add-on under the release datadir."""
+    url = kodi_zip_url(datadir, addon_id, version)
+    if not kodi_path_has_parent(url, datadir):
+        fail("Kodi zip URL %s is not under datadir %s" % (url, datadir))
+    if not url.startswith(datadir):
+        fail("Kodi zip URL %s does not start with %s" % (url, datadir))
+    rest = url[len(datadir):]
+    expected = "%s/%s-%s.zip" % (addon_id, addon_id, version)
+    if rest != expected:
+        fail("Kodi zip URL %s is not %s" % (url, datadir + expected))
+    tag, filename = rest.split("/", 1)
+    return url, tag, filename
+
+
+def assert_testing_release_layout(fragment):
+    dirs = repository_dirs(fragment)
+    if not dirs:
+        fail("testing repository add-on has no repository extension")
+    if dirs["datadir"] != RELEASE_DOWNLOAD_DATADIR:
+        fail("testing datadir is %s" % dirs["datadir"])
+    if dirs["artdir"] != TESTING_ARTDIR:
+        fail("testing artdir is %s" % dirs["artdir"])
+    if dirs["info"] != TESTING_ARTDIR + "addons.xml":
+        fail("testing info URL is %s" % dirs["info"])
+    if dirs["checksum"] != TESTING_ARTDIR + "addons.xml.md5":
+        fail("testing checksum URL is %s" % dirs["checksum"])
+    return dirs
 
 
 def addon_fragment(text):
@@ -535,20 +726,47 @@ def build_testing_channel(primescene):
             file=sys.stderr,
         )
 
-    # Pack straight into the test datadir. The source folder stays free of the
-    # zip; Kodi installs that zip from /testing, not from the add-on folder.
+    # The File manager install zip and the package 1.0.0 clients download when
+    # they update this repository. Kodi 1.0.1 reads the zip from the release
+    # datadir; this Pages copy is the fallback.
     version, dest, fragment = pack_repo_addon(TESTING_REPO, output / TESTING_REPO)
     fragments[TESTING_REPO] = fragment
     print("testing repo %s %s" % (TESTING_REPO, version))
     install_zip = output / dest.name
     write_bytes(install_zip, dest.read_bytes())
     for stale in output.glob("%s-*.zip" % TESTING_REPO):
-        if stale.name != dest.name:
+        if stale.name != dest.name and stale.name not in TESTING_KEEP_ROOT_ZIPS:
             stale.unlink()
 
     for child in list(output.iterdir()) if output.is_dir() else []:
         if child.is_dir() and child.name not in {TESTING_PLUGIN, TESTING_REPO}:
             shutil.rmtree(child)
+
+    check_kodi_url_rules()
+    dirs = assert_testing_release_layout(fragments[TESTING_REPO])
+    listed_versions = (
+        (TESTING_PLUGIN, plugin_version),
+        (TESTING_REPO, version),
+    )
+    for addon_id, addon_version in listed_versions:
+        if metadata_path_text(fragments[addon_id]):
+            fail(
+                "%s metadata <path> is joined onto the datadir and also moves icon and fanart"
+                % addon_id
+            )
+        zip_url, _tag, filename = release_asset_from_datadir(
+            dirs["datadir"], addon_id, addon_version
+        )
+        print("testing kodi zip %s" % zip_url)
+        print("testing pages zip %s/%s/%s/%s" % (PAGES, TESTING_DIR, addon_id, filename))
+        for kind, relative in metadata_assets(fragments[addon_id]).items():
+            asset_url = kodi_add_file_to_folder(
+                kodi_add_file_to_folder(dirs["artdir"], addon_id), relative
+            )
+            prefix = "%s%s/" % (dirs["artdir"], addon_id)
+            if not asset_url.startswith(prefix) or kodi_path_has_parent(asset_url, dirs["datadir"]):
+                fail("%s %s URL %s left the Pages artwork directory" % (addon_id, kind, asset_url))
+            print("testing %s %s" % (kind, asset_url))
 
     root, digest, expected = write_addons_xml(
         output, fragments, (TESTING_PLUGIN, TESTING_REPO)
@@ -653,7 +871,15 @@ def main():
         action="store_true",
         help="Also write the bumped repository add-ons into the source checkouts.",
     )
+    parser.add_argument(
+        "--check-kodi-urls",
+        action="store_true",
+        help="Check Kodi zip and artwork URL construction, then exit.",
+    )
     args = parser.parse_args()
+    if args.check_kodi_urls:
+        print(check_kodi_url_rules())
+        return
     if bool(args.primescene) != bool(args.smoothflix):
         fail("public build needs both --primescene and --smoothflix")
     if not args.primescene and not args.testing_primescene:
