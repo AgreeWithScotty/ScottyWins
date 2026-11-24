@@ -4,9 +4,11 @@ The public channel (`addons.xml` at the site root, `repository.scottywins`) buil
 
 The test channel is a separate Kodi repository on the same GitHub Pages site. It lists Smooth Prime (`plugin.video.primeinterface`) from the PrimeScene `testing` branch, plus `repository.scottywins.testing`. It does not list SmoothFlix or the public repository add-ons.
 
-Install in Kodi's File manager from `https://agreewithscotty.github.io/ScottyWins/testing/` and choose `repository.scottywins.testing-1.0.0.zip`. The trailing slash matters: Kodi appends the filename to the source path. Direct install zip:
+Install in Kodi's File manager from `https://agreewithscotty.github.io/ScottyWins/testing/` and choose `repository.scottywins.testing-1.0.1.zip`. The trailing slash matters: Kodi appends the filename to the source path. Direct install zip:
 
-https://agreewithscotty.github.io/ScottyWins/testing/repository.scottywins.testing-1.0.0.zip
+https://agreewithscotty.github.io/ScottyWins/testing/repository.scottywins.testing-1.0.1.zip
+
+`repository.scottywins.testing-1.0.0.zip` stays in that folder for the original install link. A copy already installed at 1.0.0 keeps its Pages datadir until Kodi updates the repository add-on to 1.0.1. That update is a normal add-on update. It does not need a reinstall.
 
 GitHub Pages for this repo publishes the `main` branch only. Those URLs answer after this is on `main`.
 
@@ -56,3 +58,19 @@ The test output is `testing/addons.xml`, `testing/addons.xml.md5`, the zips unde
 Follow the Promote steps in the ScottyWins README: open a pull request from PrimeScene `testing` into `release`, use **Merge pull request**, then run the Update repository workflow. The public rebuild does not copy `testing/addons.xml` onto the public index.
 
 After the public channel is serving that version, the next test build needs a higher `X.Y.Z` again.
+
+## Download counts
+
+Kodi builds each package URL as `datadir + addon-id + "/" + addon-id + "-" + version + ".zip"`. From repository 1.0.1 the testing datadir is `https://github.com/AgreeWithScotty/ScottyWins/releases/download/`, so Smooth Prime is:
+
+https://github.com/AgreeWithScotty/ScottyWins/releases/download/plugin.video.primeinterface/plugin.video.primeinterface-X.Y.Z.zip
+
+That URL is the GitHub Release tagged `plugin.video.primeinterface`, asset `plugin.video.primeinterface-X.Y.Z.zip`. The Update repository workflow uploads the asset when it rebuilds the test channel. It does not replace an asset that is already there, because replacing it resets `download_count`. The same zip remains under `testing/plugin.video.primeinterface/` for 1.0.0 clients.
+
+Icon and fanart URLs stay under `https://agreewithscotty.github.io/ScottyWins/testing/`. The changelog Kodi shows for the test build is the `<news>` text in `testing/addons.xml`.
+
+Read the counts from:
+
+https://api.github.com/repos/AgreeWithScotty/ScottyWins/releases/tags/plugin.video.primeinterface
+
+Each entry in `assets` has `name` and `download_count`. One asset is one version.

@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  # git push of the rebuilt indexes, and GitHub Release asset uploads
   contents: write
 
 concurrency:
@@ -54,6 +55,13 @@ jobs:
             --primescene .sources/PrimeScene \
             --smoothflix .sources/SmoothFlix \
             --testing-primescene "${{ steps.testing.outputs.source }}"
+
+      # Upload even when the commit below has nothing new. An asset that is
+      # already present is left alone so its download_count is kept.
+      - name: Publish testing zips as GitHub Release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 tools/publish_test_releases.py
 
       - name: Commit new add-on versions
         run: |
